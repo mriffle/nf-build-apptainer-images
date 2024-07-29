@@ -5,18 +5,19 @@ include { CHECK_BUILD_APPTAINER } from "../modules/check_build_apptainer"
 workflow wf_apptainer {
 
     take:
-        docker_image_file_ch
+        docker_image_file
         apptainer_cache_dir
         apptainer_tmp_dir
     
     main:
 
-    // Extract Docker images
-    EXTRACT_DOCKER_IMAGES(docker_image_file_ch)
+    def config = new ConfigSlurper().parse(docker_image_file.text)
+    def dockerImages = config.params.images.values()
+    docker_images = Channel.fromList(dockerImages)
 
     // Check and build Apptainer images
     CHECK_BUILD_APPTAINER(
-        EXTRACT_DOCKER_IMAGES.out.docker_images.flatten(),
+        docker_images.flatten(),
         apptainer_cache_dir,
         apptainer_tmp_dir
     )
