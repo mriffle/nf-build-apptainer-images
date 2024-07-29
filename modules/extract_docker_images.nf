@@ -5,7 +5,7 @@ process EXTRACT_DOCKER_IMAGES {
         path docker_image_file
 
     output:
-        emit: docker_images
+        val docker_images, emit: docker_images
 
     exec:
     def config = new ConfigSlurper().parse(docker_image_file.text)
