@@ -15,31 +15,16 @@ workflow {
         error "ERROR: docker_images_file is not set"
     }
 
-    // Validate apptainer_cache_dir
-    validateDir(params.apptainer_cache_dir)
+    if (!params.apptainer_cache_dir) {
+        error "ERROR: docker_images_file is not set"
+    }
 
-    // Validate apptainer_tmp_dir
-    validateDir(params.apptainer_tmp_dir)
+    if (!params.apptainer_tmp_dir) {
+        error "ERROR: docker_images_file is not set"
+    }
 
     wf_apptainer(params.docker_images_file, params.apptainer_cache_dir, params.apptainer_tmp_dir)
 
-}
-
-// check if the directory exists
-def validateDir(param) {
-    if (!param) {
-        error "ERROR: ${param} is not set."
-    }
-    def dir = file(param)
-    if (!dir.exists()) {
-        error "ERROR: ${param} does not exist"
-    }
-    if (!dir.isDirectory()) {
-        error "ERROR: ${param} is not a directory"
-    }
-    if (!dir.canWrite()) {
-        error "ERROR: ${param} is not writable"
-    }
 }
 
 //
