@@ -11,9 +11,14 @@ workflow wf_apptainer {
     
     main:
 
-    def config = new ConfigSlurper().parse(docker_image_file.text)
-    def dockerImages = config.params.images.values()
-    docker_images = Channel.fromList(dockerImages)
+    // Create a channel from the docker_image_file path
+    docker_image_file_ch = Channel.fromPath(docker_image_file)
+
+    // Extract Docker images
+    docker_images = docker_image_file_ch.flatMap { file ->
+        def config = new ConfigSlurper().parse(file.text)
+        config.params.images.values()
+    }
 
     // Check and build Apptainer images
     CHECK_BUILD_APPTAINER(
