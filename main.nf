@@ -17,10 +17,10 @@ workflow {
     docker_image_file_ch = file(params.docker_images_file, checkIfExists: true)
 
     // Validate apptainer_cache_dir
-    validateDir(params.apptainer_cache_dir, "Apptainer cache directory")
+    validateDir(params.apptainer_cache_dir)
 
     // Validate apptainer_tmp_dir
-    validateDir(params.apptainer_tmp_dir, "Apptainer temporary directory")
+    validateDir(params.apptainer_tmp_dir)
 
     wf_apptainer(docker_image_file_ch, params.apptainer_cache_dir, params.apptainer_tmp_dir)
 
