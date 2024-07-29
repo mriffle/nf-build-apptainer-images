@@ -1,5 +1,4 @@
 // Modules
-include { EXTRACT_DOCKER_IMAGES } from "../modules/extract_docker_images"
 include { CHECK_BUILD_APPTAINER } from "../modules/check_build_apptainer"
 
 workflow wf_apptainer {
