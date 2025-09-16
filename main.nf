@@ -23,7 +23,7 @@ workflow {
         error "ERROR: docker_images_file is not set"
     }
 
-    wf_apptainer(params.docker_images_file, params.apptainer_cache_dir, params.apptainer_tmp_dir)
+    wf_apptainer(params.docker_images_file, params.docker_images_override_file, params.apptainer_cache_dir, params.apptainer_tmp_dir)
 
 }
 
