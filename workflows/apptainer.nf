@@ -19,16 +19,35 @@ workflow wf_apptainer {
         (p instanceof Path) ? new File(p.toString()) : new File(p as String)
     }
 
-    // Load params.images from a Groovy/Nextflow-style config file.
-    // If allowEmpty=true and params.images missing, return empty map.
+    // Load params.images from a Groovy/Nextflow-style config file or URL.
+    // If allowEmpty=true and the file/URL is missing or params.images is absent, return [:].
     def loadImagesMap = { p, boolean allowEmpty = false ->
-        def f = asFile(p)
-        assert f && f.exists() : "Config file not found: ${p}"
-        def cfg = new ConfigSlurper().parse(f.toURI().toURL())
+        if (p == null) {
+            if (allowEmpty) return [:]
+            throw new IllegalArgumentException("No config path/URL provided (null)")
+        }
+
+        URL url
+        try {
+            // Try URL first (supports http/https/file)
+            url = new URL(p.toString())
+        }
+        catch (MalformedURLException e) {
+            // Not a URL: treat as local file
+            def f = asFile(p)
+            if (!f?.exists()) {
+                if (allowEmpty) return [:]
+                throw new FileNotFoundException("Config file not found: ${p}")
+            }
+            url = f.toURI().toURL()
+        }
+
+        def cfg = new ConfigSlurper().parse(url)
         def m = cfg?.params?.images
+
         if (m instanceof Map) return (Map)m
         if (allowEmpty) return [:]
-        throw new IllegalStateException("Expected params.images Map in ${f.absolutePath}")
+        throw new IllegalStateException("Expected params.images Map in ${p}")
     }
 
     // -- base config (strict) -----------------------------------------------
