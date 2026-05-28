@@ -1,0 +1,12 @@
+# Nextflow runtime clutter
+.nextflow/
+.nextflow.log*
+work/
+report*.html
+timeline*.html
+trace*.txt
+dag*.html
+
+# Test harness: downloaded Nextflow distributions + per-test scratch
+tests/.nf/
+tests/.work/

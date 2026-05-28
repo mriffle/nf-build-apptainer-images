@@ -4,91 +4,42 @@ include { CHECK_BUILD_APPTAINER } from "../modules/check_build_apptainer"
 workflow wf_apptainer {
 
     take:
-    docker_image_file               // required: path or string to Groovy/Nextflow config
+    docker_image_file               // required: path or string to a Groovy/Nextflow config defining params.images
     docker_images_override_file     // optional: path or string; may be null or absent
     apptainer_cache_dir             // e.g., '/scratch/apptainer/cache'
     apptainer_tmp_dir               // e.g., '/scratch/apptainer/tmp'
 
     main:
 
-    // -- helpers -------------------------------------------------------------
+    // Load the base images map (strict: the file must define params.images) and
+    // an optional override map (missing/empty -> [:]); override keys win. The
+    // config-loading logic lives in lib/ImageConfig.groovy so it stays plain
+    // Groovy -- the strict .nf parser only governs this workflow script.
+    def base_map     = ImageConfig.loadImagesMap(docker_image_file, false)
+    def overrideFile = ImageConfig.asFile(docker_images_override_file)
+    def override_map = (overrideFile && overrideFile.exists()) ? ImageConfig.loadImagesMap(overrideFile, true) : [:]
+    def merged_map   = base_map + override_map
 
-    // Convert Nextflow Path or String into java.io.File (or null)
-    def asFile = { p ->
-        if (p == null) return null
-        (p instanceof Path) ? new File(p.toString()) : new File(p as String)
+    // Guard: an empty merge means the base config lacked or emptied params.images
+    // (ConfigSlurper coerces a missing key to an empty map, so this also catches
+    // typos / wrong files). Fail loudly instead of silently building nothing --
+    // otherwise the downstream run would re-convert images on the head node.
+    if (!merged_map) {
+        def msg = "ERROR: No images to build. '${docker_image_file}'"
+        if (overrideFile && overrideFile.exists()) {
+            msg += " (with override '${overrideFile}')"
+        }
+        msg += " yielded an empty 'params.images' map. Check the path/URL and that the file"
+        msg += " defines params.images = [ name: 'registry/image:tag', ... ]."
+        error msg
     }
 
-    // Load params.images from a Groovy/Nextflow-style config file or URL.
-    // If allowEmpty=true and the file/URL is missing or params.images is absent, return [:].
-    def loadImagesMap = { p, boolean allowEmpty = false ->
-        if (p == null) {
-            if (allowEmpty) return [:]
-            throw new IllegalArgumentException("No config path/URL provided (null)")
-        }
-
-        URL url
-        try {
-            // Try URL first (supports http/https/file)
-            url = new URL(p.toString())
-        }
-        catch (MalformedURLException e) {
-            // Not a URL: treat as local file
-            def f = asFile(p)
-            if (!f?.exists()) {
-                if (allowEmpty) return [:]
-                throw new FileNotFoundException("Config file not found: ${p}")
-            }
-            url = f.toURI().toURL()
-        }
-
-        def cfg = new ConfigSlurper().parse(url)
-        def m = cfg?.params?.images
-
-        if (m instanceof Map) return (Map)m
-        if (allowEmpty) return [:]
-        throw new IllegalStateException("Expected params.images Map in ${p}")
-    }
-
-    // -- base config (strict) -----------------------------------------------
-
-    base_map_ch = Channel
-        .of(docker_image_file)
-        .map { loadImagesMap(it, false) }   // must contain params.images map
-
-    // -- override config (optional) -----------------------------------------
-
-    def overrideFile = asFile(docker_images_override_file)
-
-    override_map_ch = (overrideFile && overrideFile.exists())
-        ? Channel.of(loadImagesMap(overrideFile, true))  // allowEmpty -> [:] if images missing
-        : Channel.of([:])                                // fallback empty map if no file
-
-    // -- merge & flatten -----------------------------------------------------
-
-    // Merge maps: keys in override replace base
-    merged_map_ch = base_map_ch
-        .combine(override_map_ch)
-        .map { base, over -> base + over }
-
-    // Emit one image definition per item (values of the merged map)
-    docker_images_ch = merged_map_ch
-        .map { it.values() }
-        .flatten()
-
-    // Ensure value channels for dirs
-    cache_ch = Channel.value(apptainer_cache_dir)
-    tmp_ch   = Channel.value(apptainer_tmp_dir)
-
-    // -- module call ---------------------------------------------------------
+    // Emit one Docker image URI per item.
+    docker_images_ch = Channel.fromList(merged_map.values().toList()).flatten()
 
     CHECK_BUILD_APPTAINER(
-        docker_images_ch,   // one image per item
-        cache_ch,
-        tmp_ch
+        docker_images_ch,
+        Channel.value(apptainer_cache_dir),
+        Channel.value(apptainer_tmp_dir)
     )
-
-    // If the caller needs outputs, you can emit from the module like:
-    // emit:
-    //   built = CHECK_BUILD_APPTAINER.out
 }

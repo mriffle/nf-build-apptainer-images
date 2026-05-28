@@ -11,19 +11,43 @@ include { wf_apptainer } from "./workflows/apptainer"
 //
 workflow {
 
+    main:
+
     if (!params.docker_images_file) {
         error "ERROR: docker_images_file is not set"
     }
 
     if (!params.apptainer_cache_dir) {
-        error "ERROR: docker_images_file is not set"
+        error "ERROR: apptainer_cache_dir is not set"
     }
 
     if (!params.apptainer_tmp_dir) {
-        error "ERROR: docker_images_file is not set"
+        error "ERROR: apptainer_tmp_dir is not set"
     }
 
+    log.info """\
+        nf-build-apptainer-images
+        =========================
+        docker_images_file : ${params.docker_images_file}
+        apptainer_cache_dir: ${params.apptainer_cache_dir}
+        apptainer_tmp_dir  : ${params.apptainer_tmp_dir}
+
+        IMPORTANT: your downstream Nextflow workflow must use this same directory as
+        its Apptainer image cache, or it will not find the images built here and will
+        re-convert them on the head node. Set ONE of the following for that run:
+            apptainer.cacheDir = '${params.apptainer_cache_dir}'   (in the downstream config)
+            export NXF_APPTAINER_CACHEDIR=${params.apptainer_cache_dir}
+        """.stripIndent()
+
     wf_apptainer(params.docker_images_file, params.docker_images_override_file, params.apptainer_cache_dir, params.apptainer_tmp_dir)
+
+    // Send the completion email (new-syntax workflow event handler).
+    onComplete:
+    try {
+        email()
+    } catch (Exception e) {
+        println "Warning: Error sending completion email."
+    }
 
 }
 
@@ -48,13 +72,4 @@ def email() {
 //
 workflow dummy {
     println "This is a workflow that doesn't do anything."
-}
-
-// Email notifications:
-workflow.onComplete {
-    try {
-        email()
-    } catch (Exception e) {
-        println "Warning: Error sending completion email."
-    }
 }

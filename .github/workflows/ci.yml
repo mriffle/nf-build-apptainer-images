@@ -1,0 +1,51 @@
+name: CI
+
+# Run on every push (any branch/tag), plus manual dispatch.
+on:
+  push:
+  workflow_dispatch:
+
+# A newer push to the same ref cancels in-progress runs, to save runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # One job per Nextflow version; the matrix entries run in parallel on
+    # separate runners (Nextflow 25 and 26 side by side).
+    name: Nextflow ${{ matrix.nextflow_version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Mirror tests/run_tests.sh defaults: the 25-line floor and latest 26.
+        nextflow_version: ["25.10.0", "26.04.3"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Nextflow)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Cache the downloaded Nextflow launcher + this version's distribution
+      # (the harness keeps them under tests/.nf with a local NXF_HOME), so reruns
+      # don't re-download. Keyed per version; tests/.work is never cached.
+      - name: Cache Nextflow distribution
+        uses: actions/cache@v4
+        with:
+          path: tests/.nf
+          key: nextflow-${{ runner.os }}-${{ matrix.nextflow_version }}
+
+      - name: Run test harness
+        env:
+          # One version per job → true parallelism across the matrix.
+          NF_VERSIONS: ${{ matrix.nextflow_version }}
+          # Keep Nextflow's own console output free of ANSI escape codes in logs.
+          NXF_ANSI_LOG: "false"
+        run: bash tests/run_tests.sh
