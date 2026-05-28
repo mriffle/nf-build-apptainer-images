@@ -31,12 +31,6 @@ workflow {
         docker_images_file : ${params.docker_images_file}
         apptainer_cache_dir: ${params.apptainer_cache_dir}
         apptainer_tmp_dir  : ${params.apptainer_tmp_dir}
-
-        IMPORTANT: your downstream Nextflow workflow must use this same directory as
-        its Apptainer image cache, or it will not find the images built here and will
-        re-convert them on the head node. Set ONE of the following for that run:
-            apptainer.cacheDir = '${params.apptainer_cache_dir}'   (in the downstream config)
-            export NXF_APPTAINER_CACHEDIR=${params.apptainer_cache_dir}
         """.stripIndent()
 
     wf_apptainer(params.docker_images_file, params.docker_images_override_file, params.apptainer_cache_dir, params.apptainer_tmp_dir)
